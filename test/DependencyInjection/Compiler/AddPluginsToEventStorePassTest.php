@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace ProophTest\Bundle\EventStore\DependencyInjection\Compiler;
 
-use Prooph\Bundle\EventStore\DependencyInjection\Compiler\PluginsPass;
+use Prooph\Bundle\EventStore\DependencyInjection\Compiler\AddPluginsToEventStorePass;
 use ProophTest\Bundle\EventStore\DependencyInjection\Fixture\Plugin\BlackHole;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 
-class PluginsPassTest extends CompilerPassTestCase
+class AddPluginsToEventStorePassTest extends CompilerPassTestCase
 {
     protected function registerCompilerPass(ContainerBuilder $container)
     {
-        $container->addCompilerPass(new PluginsPass());
+        $container->addCompilerPass(new AddPluginsToEventStorePass());
     }
 
     /** @test */

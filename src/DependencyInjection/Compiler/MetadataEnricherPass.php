@@ -16,35 +16,35 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 
-class MetadataEnricherPass implements CompilerPassInterface
+final class MetadataEnricherPass implements CompilerPassInterface
 {
-    public function process(ContainerBuilder $container)
+    public function process(ContainerBuilder $container): void
     {
         if (! $container->hasParameter('prooph_event_store.stores')) {
             return;
         }
 
-        $stores = $container->getParameter('prooph_event_store.stores');
+        $storeNames = array_keys($container->getParameter('prooph_event_store.stores'));
 
-        $globalPlugins = $container->findTaggedServiceIds('prooph_event_store.metadata_enricher');
+        $globalPluginIds = array_keys($container->findTaggedServiceIds('prooph_event_store.metadata_enricher'));
 
-        foreach ($stores as $name => $store) {
-            $storeEnricherPlugins = $container->findTaggedServiceIds(sprintf('prooph_event_store.%s.metadata_enricher', $name));
-            $plugins = array_merge($globalPlugins, $storeEnricherPlugins);
+        foreach ($storeNames as $name) {
+            $storeEnricherPluginIds = array_keys($container->findTaggedServiceIds("prooph_event_store.$name.metadata_enricher"));
+            $pluginIds = array_merge($globalPluginIds, $storeEnricherPluginIds);
             $enrichers = [];
 
-            foreach ($plugins as $id => $args) {
+            foreach ($pluginIds as $id) {
                 $enrichers[] = new Reference($id);
             }
 
-            $metadataEnricherAggregateId = sprintf('prooph_event_store.%s.%s', 'metadata_enricher_aggregate', $name);
+            $metadataEnricherAggregateId = "prooph_event_store.metadata_enricher_aggregate.$name";
             $metadataEnricherAggregateDefinition = $container->getDefinition($metadataEnricherAggregateId);
             $metadataEnricherAggregateDefinition->setArguments([$enrichers]);
 
-            $metadataEnricherId = sprintf('prooph_event_store.%s.%s', 'metadata_enricher_plugin', $name);
+            $metadataEnricherId = "prooph_event_store.metadata_enricher_plugin.$name";
             $metadataEnricherDefinition = $container->getDefinition($metadataEnricherId);
             $metadataEnricherDefinition->setClass(MetadataEnricherPlugin::class);
-            $metadataEnricherDefinition->addTag(sprintf('prooph_event_store.%s.plugin', $name));
+            $metadataEnricherDefinition->addTag("prooph_event_store.$name.plugin");
             $metadataEnricherDefinition->setArguments([new Reference($metadataEnricherAggregateId)]);
         }
     }

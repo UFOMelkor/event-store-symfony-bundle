@@ -57,7 +57,7 @@ final class RegisterProjectionsPass implements CompilerPassInterface
                 }
 
                 $projectionManagerForProjectionsLocator[$tag['projection_name']] = new Reference(
-                    sprintf('prooph_event_store.projection_manager.%s', $tag['projection_manager'])
+                    "prooph_event_store.projection_manager.{$tag['projection_manager']}"
                 );
                 $projectionsLocator[$tag['projection_name']] = new Reference($id);
             }

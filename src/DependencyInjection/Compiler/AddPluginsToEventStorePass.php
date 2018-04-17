@@ -14,25 +14,24 @@ namespace Prooph\Bundle\EventStore\DependencyInjection\Compiler;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
-class PluginsPass implements CompilerPassInterface
+final class AddPluginsToEventStorePass implements CompilerPassInterface
 {
-    public function process(ContainerBuilder $container)
+    public function process(ContainerBuilder $container): void
     {
         if (! $container->hasParameter('prooph_event_store.stores')) {
             return;
         }
 
-        $stores = $container->getParameter('prooph_event_store.stores');
+        $storeNames = array_keys($container->getParameter('prooph_event_store.stores'));
+        $globalPluginIds = array_keys($container->findTaggedServiceIds('prooph_event_store.plugin'));
 
-        foreach ($stores as $name => $store) {
-            $globalPlugins = $container->findTaggedServiceIds('prooph_event_store.plugin');
-            $storePlugins = $container->findTaggedServiceIds(sprintf('prooph_event_store.%s.plugin', $name));
+        foreach ($storeNames as $name) {
+            $storePluginIds = array_keys($container->findTaggedServiceIds("prooph_event_store.$name.plugin"));
 
-            $plugins = array_merge($globalPlugins, $storePlugins);
+            $pluginIds = array_merge($globalPluginIds, $storePluginIds);
 
-            $eventStoreDefinition = $container->findDefinition(sprintf('prooph_event_store.%s', $name));
-
-            $eventStoreDefinition->addArgument(array_keys($plugins));
+            $eventStoreDefinition = $container->findDefinition("prooph_event_store.$name");
+            $eventStoreDefinition->addArgument($pluginIds);
         }
     }
 }

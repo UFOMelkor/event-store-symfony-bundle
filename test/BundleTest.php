@@ -13,7 +13,7 @@ namespace ProophTest\Bundle\EventStore;
 
 use PHPUnit\Framework\TestCase;
 use Prooph\Bundle\EventStore\DependencyInjection\Compiler\MetadataEnricherPass;
-use Prooph\Bundle\EventStore\DependencyInjection\Compiler\PluginsPass;
+use Prooph\Bundle\EventStore\DependencyInjection\Compiler\AddPluginsToEventStorePass;
 use Prooph\Bundle\EventStore\ProophEventStoreBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
@@ -35,7 +35,7 @@ class BundleTest extends TestCase
         $foundMetadataEnricherPass = false;
 
         foreach ($passes as $pass) {
-            if ($pass instanceof PluginsPass) {
+            if ($pass instanceof AddPluginsToEventStorePass) {
                 $foundPluginPass = true;
             } elseif ($pass instanceof MetadataEnricherPass) {
                 $foundMetadataEnricherPass = true;

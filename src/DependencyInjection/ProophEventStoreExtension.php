@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Prooph\Bundle\EventStore\DependencyInjection;
 
 use Prooph\Bundle\EventStore\Exception\RuntimeException;
-use Prooph\EventStore\EventStore;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -49,7 +48,7 @@ final class ProophEventStoreExtension extends Extension
         self::loadProjectionManagers($config, $container);
 
         if (! empty($config['stores'])) {
-            $this->loadEventStores(EventStore::class, $config, $container);
+            self::loadEventStores($config, $container);
         }
     }
 
@@ -128,24 +127,19 @@ final class ProophEventStoreExtension extends Extension
      * Loads event store configuration depending on type. For configuration examples, please take look at
      * test/DependencyInjection/Fixture/config files
      *
-     * @param string           $class
      * @param array            $config
      * @param ContainerBuilder $container
      */
-    private function loadEventStores(string $class, array $config, ContainerBuilder $container)
+    private static function loadEventStores(array $config, ContainerBuilder $container): void
     {
         $eventStores = [];
-
         foreach (array_keys($config['stores']) as $name) {
-            $eventStores[$name] = 'prooph_event_store.'.$name;
+            $eventStores[$name] = "prooph_event_store.$name";
         }
         $container->setParameter('prooph_event_store.stores', $eventStores);
 
-        $def = $container->getDefinition('prooph_event_store.store_definition');
-        $def->setClass($class);
-
         foreach ($config['stores'] as $name => $options) {
-            $this->loadEventStore($name, $options, $container);
+            self::loadEventStore($name, $options, $container);
         }
     }
 
@@ -161,70 +155,55 @@ final class ProophEventStoreExtension extends Extension
      * @throws \Symfony\Component\DependencyInjection\Exception\InvalidArgumentException
      * @throws \Prooph\Bundle\EventStore\Exception\RuntimeException
      */
-    private function loadEventStore(string $name, array $options, ContainerBuilder $container)
+    private static function loadEventStore(string $name, array $options, ContainerBuilder $container): void
     {
-        $eventStoreId = 'prooph_event_store.'.$name;
-        $eventStoreDefinition = $container
-            ->setDefinition(
-                $eventStoreId,
-                new ChildDefinition('prooph_event_store.store_definition')
-            )
-            ->setArguments(
-                [
-                    $name,
-                    new Reference($options['event_store']),
-                    new Reference('prooph_event_store.action_event_emitter_factory'),
-                    $options['event_emitter'],
-                    $options['wrap_action_event_emitter'],
-                    new Reference('prooph_event_store.plugins_locator'),
-                ]
-            );
+        $eventStoreId = "prooph_event_store.$name";
+        $eventStoreDefinition = $container->setDefinition(
+            $eventStoreId,
+            new ChildDefinition('prooph_event_store.store_definition')
+        );
+        $eventStoreDefinition->setArguments([
+            $name,
+            new Reference($options['event_store']),
+            new Reference('prooph_event_store.action_event_emitter_factory'),
+            $options['event_emitter'],
+            $options['wrap_action_event_emitter'],
+            new Reference('prooph_event_store.plugins_locator'),
+        ]);
 
-        if (! empty($options['repositories'])) {
-            foreach ($options['repositories'] as $repositoryName => $repositoryConfig) {
-                $repositoryClass = $repositoryConfig['repository_class'] ?? $repositoryName;
+        foreach ($options['repositories'] as $repositoryName => $repositoryConfig) {
+            $repositoryClass = $repositoryConfig['repository_class'] ?? $repositoryName;
 
-                if (! class_exists($repositoryClass)) {
-                    throw new RuntimeException(sprintf(
-                        "Configure repository class using either passing FQCN as a key or 'repository_class' configuration key. Given: %s",
-                        $repositoryClass
-                    ));
-                }
-
-                $repositoryDefinition = $container
-                    ->setDefinition(
-                        $repositoryName,
-                        new ChildDefinition('prooph_event_store.repository_definition')
-                    )
-                    ->setArguments(
-                        [
-                            $repositoryClass,
-                            new Reference($eventStoreId),
-                            $repositoryConfig['aggregate_type'],
-                            new Reference($repositoryConfig['aggregate_translator']),
-                            $repositoryConfig['snapshot_store'] ? new Reference($repositoryConfig['snapshot_store']) : null,
-                            $repositoryConfig['stream_name'],
-                            $repositoryConfig['one_stream_per_aggregate'],
-                        ]
-                    );
+            if (! class_exists($repositoryClass)) {
+                throw new RuntimeException(
+                    "Configure repository class using either passing FQCN as a key or 'repository_class' "
+                    . "configuration key. Given: '$repositoryClass'"
+                );
             }
+
+            $repositoryDefinition = $container->setDefinition(
+                $repositoryName,
+                new ChildDefinition('prooph_event_store.repository_definition')
+            );
+            $repositoryDefinition->setArguments([
+                $repositoryClass,
+                new Reference($eventStoreId),
+                $repositoryConfig['aggregate_type'],
+                new Reference($repositoryConfig['aggregate_translator']),
+                $repositoryConfig['snapshot_store'] ? new Reference($repositoryConfig['snapshot_store']) : null,
+                $repositoryConfig['stream_name'],
+                $repositoryConfig['one_stream_per_aggregate'],
+            ]);
         }
 
-        // define metadata enrichers
-        $metadataEnricherAggregateId = sprintf('prooph_event_store.%s.%s', 'metadata_enricher_aggregate', $name);
-
-        $metadataEnricherAggregateDefinition = $container
-            ->setDefinition(
-                $metadataEnricherAggregateId,
-                new ChildDefinition('prooph_event_store.metadata_enricher_aggregate_definition')
-            );
-
-        $metadataEnricherId = sprintf('prooph_event_store.%s.%s', 'metadata_enricher_plugin', $name);
-
-        $metadataEnricherDefinition = $container
-            ->setDefinition(
-                $metadataEnricherId,
-                new ChildDefinition('prooph_event_store.metadata_enricher_plugin_definition')
-            );
+        // define metadata enricher aggregate + plugin
+        $container->setDefinition(
+            "prooph_event_store.metadata_enricher_aggregate.$name",
+            new ChildDefinition('prooph_event_store.metadata_enricher_aggregate_definition')
+        );
+        $container->setDefinition(
+            "prooph_event_store.metadata_enricher_plugin.$name",
+            new ChildDefinition('prooph_event_store.metadata_enricher_plugin_definition')
+        );
     }
 }
